@@ -16,7 +16,7 @@ import { defaultColumnsNumber } from './shared';
 
 export default function save( { attributes } ) {
 	const {
-		columns = defaultColumnsNumber( attributes ),
+		columns = 3, // defaultColumnsNumber( attributes ),
 		imageCrop,
 		caption,
 		// linkTo, // Needs to be passed down to children.

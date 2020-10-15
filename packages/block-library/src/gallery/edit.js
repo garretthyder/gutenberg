@@ -11,6 +11,7 @@ import {
 	reduce,
 	some,
 	toString,
+	isEqual,
 } from 'lodash';
 
 /**
@@ -81,6 +82,7 @@ class GalleryEdit extends Component {
 		this.state = {
 			selectedImage: null,
 			attachmentCaptions: null,
+			images: [],
 		};
 	}
 
@@ -117,7 +119,7 @@ class GalleryEdit extends Component {
 			} );
 		} );
 
-		this.setAttributes( {
+		this.setState( {
 			images: newImages.map( ( newImage ) => ( {
 				id: toString( newImage.id ),
 				url: newImage.url,
@@ -187,7 +189,27 @@ class GalleryEdit extends Component {
 
 	componentDidMount() {
 		const { attributes, mediaUpload } = this.props;
-		const { images } = attributes;
+		let images;
+		if ( attributes.imageUploads?.length > 0 ) {
+			images = attributes.imageUploads;
+			this.setAttributes( { imageUploads: undefined } );
+		} else {
+			images = this.props
+				.getBlock( this.props.clientId )
+				.innerBlocks.map( ( block ) => {
+					return {
+						id: block.attributes.id,
+						url: block.attributes.url,
+					};
+				} );
+		}
+
+		if ( ! isEqual( images, this.state.images ) ) {
+			this.setState( {
+				images,
+			} );
+		}
+
 		if (
 			Platform.OS === 'web' &&
 			images &&
@@ -205,6 +227,17 @@ class GalleryEdit extends Component {
 	}
 
 	componentDidUpdate( prevProps ) {
+		const images = this.props
+			.getBlock( this.props.clientId )
+			.innerBlocks.map( ( block ) => {
+				return { id: block.attributes.id, url: block.attributes.url };
+			} );
+		if ( ! isEqual( images, this.state.images ) ) {
+			this.setState( {
+				images,
+			} );
+		}
+
 		// Deselect images when deselecting the block
 		if ( ! this.props.isSelected && prevProps.isSelected ) {
 			this.setState( {
@@ -230,10 +263,10 @@ class GalleryEdit extends Component {
 			noticeUI,
 			insertBlocksAfter,
 		} = this.props;
+		const images = this.state.images;
 		const {
-			columns = defaultColumnsNumber( attributes ),
+			columns = defaultColumnsNumber( images ),
 			imageCrop,
-			images,
 			linkTo,
 			sizeSlug,
 		} = attributes;
@@ -311,6 +344,7 @@ class GalleryEdit extends Component {
 				{ noticeUI }
 				<Gallery
 					{ ...this.props }
+					images={ images }
 					selectedImage={ this.state.selectedImage }
 					mediaPlaceholder={ mediaPlaceholder }
 					onMoveBackward={ this.onMoveBackward }
@@ -327,55 +361,56 @@ class GalleryEdit extends Component {
 	}
 }
 export default compose( [
-	withSelect( ( select, { attributes: { images }, isSelected } ) => {
+	withSelect( ( select, { isSelected } ) => {
 		const { getMedia } = select( 'core' );
-		const { getSettings } = select( 'core/block-editor' );
+		const { getSettings, getBlock } = select( 'core/block-editor' );
 		const { imageSizes, mediaUpload } = getSettings();
 
 		let resizedImages = {};
 
-		if ( isSelected ) {
-			resizedImages = reduce(
-				images,
-				( currentResizedImages, img ) => {
-					if ( ! img.id ) {
-						return currentResizedImages;
-					}
-					const image = getMedia( img.id );
-					const sizes = reduce(
-						imageSizes,
-						( currentSizes, size ) => {
-							const defaultUrl = get( image, [
-								'sizes',
-								size.slug,
-								'url',
-							] );
-							const mediaDetailsUrl = get( image, [
-								'media_details',
-								'sizes',
-								size.slug,
-								'source_url',
-							] );
-							return {
-								...currentSizes,
-								[ size.slug ]: defaultUrl || mediaDetailsUrl,
-							};
-						},
-						{}
-					);
-					return {
-						...currentResizedImages,
-						[ parseInt( img.id, 10 ) ]: sizes,
-					};
-				},
-				{}
-			);
-		}
+		// if ( isSelected ) {
+		// 	resizedImages = reduce(
+		// 		images,
+		// 		( currentResizedImages, img ) => {
+		// 			if ( ! img.id ) {
+		// 				return currentResizedImages;
+		// 			}
+		// 			const image = getMedia( img.id );
+		// 			const sizes = reduce(
+		// 				imageSizes,
+		// 				( currentSizes, size ) => {
+		// 					const defaultUrl = get( image, [
+		// 						'sizes',
+		// 						size.slug,
+		// 						'url',
+		// 					] );
+		// 					const mediaDetailsUrl = get( image, [
+		// 						'media_details',
+		// 						'sizes',
+		// 						size.slug,
+		// 						'source_url',
+		// 					] );
+		// 					return {
+		// 						...currentSizes,
+		// 						[ size.slug ]: defaultUrl || mediaDetailsUrl,
+		// 					};
+		// 				},
+		// 				{}
+		// 			);
+		// 			return {
+		// 				...currentResizedImages,
+		// 				[ parseInt( img.id, 10 ) ]: sizes,
+		// 			};
+		// 		},
+		// 		{}
+		// 	);
+		// }
 
 		return {
 			imageSizes,
 			mediaUpload,
 			resizedImages,
+			getBlock,
 		};
 	} ),
 	withNotices,
