@@ -2,16 +2,14 @@
  * External dependencies
  */
 import {
-	every,
 	filter,
-	forEach,
 	get,
-	isEmpty,
 	map,
 	reduce,
 	some,
 	toString,
 	isEqual,
+	isEmpty,
 } from 'lodash';
 
 /**
@@ -70,13 +68,10 @@ export const GalleryEdit = ( props ) => {
 		attributes,
 		clientId,
 		noticeOperations,
-		imageSizes,
-		resizedImages,
 		className,
 		isSelected,
 		noticeUI,
 		insertBlocksAfter,
-		imageCrop,
 	} = props;
 
 	const {
@@ -84,19 +79,71 @@ export const GalleryEdit = ( props ) => {
 		columns = defaultColumnsNumber( images ),
 		sizeSlug,
 		imageUploads,
+		imageCrop,
 	} = attributes;
 
 	const [ images, setImages ] = useState( [] );
 
 	const getBlock = useSelect( ( select ) => {
-		const { getBlock } = select( 'core/block-editor' );
-		return getBlock;
+		return select( 'core/block-editor' ).getBlock;
+	} );
+
+	const imageSizing = useSelect( ( select ) => {
+		const { getMedia } = select( 'core' );
+		const { getSettings } = select( 'core/block-editor' );
+		const { imageSizes } = getSettings();
+
+		let resizedImages = {};
+
+		if ( isSelected ) {
+			resizedImages = reduce(
+				images,
+				( currentResizedImages, img ) => {
+					if ( ! img.id ) {
+						return currentResizedImages;
+					}
+					const image = getMedia( img.id );
+					const sizes = reduce(
+						imageSizes,
+						( currentSizes, size ) => {
+							const defaultUrl = get( image, [
+								'sizes',
+								size.slug,
+								'url',
+							] );
+							const mediaDetailsUrl = get( image, [
+								'media_details',
+								'sizes',
+								size.slug,
+								'source_url',
+							] );
+							return {
+								...currentSizes,
+								[ size.slug ]: defaultUrl || mediaDetailsUrl,
+							};
+						},
+						{}
+					);
+					return {
+						...currentResizedImages,
+						[ parseInt( img.id, 10 ) ]: sizes,
+					};
+				},
+				{}
+			);
+		}
+
+		return {
+			imageSizes,
+			resizedImages,
+		};
 	} );
 
 	const { replaceInnerBlocks } = useDispatch( 'core/block-editor' );
-	function onRemoveImage( index ) {
-		// need to update columns?
-	}
+
+	// function onRemoveImage( index ) {
+	// 	// need to update columns attribute at this point maybe?
+	// }
 
 	function onSelectImages( newImages ) {
 		const newBlocks = newImages.map( ( image ) => {
@@ -132,7 +179,7 @@ export const GalleryEdit = ( props ) => {
 	}
 
 	function toggleImageCrop() {
-		setAttributes( { imageCrop: ! attributes.imageCrop } );
+		setAttributes( { imageCrop: ! imageCrop } );
 	}
 
 	function getImageCropHelp( checked ) {
@@ -141,32 +188,18 @@ export const GalleryEdit = ( props ) => {
 			: __( 'Thumbnails are not cropped.' );
 	}
 
-	function getImagesSizeOption() {
+	function getImagesSizeOptions() {
 		return map(
-			filter( imageSizes, ( { slug } ) =>
-				some( resizedImages, ( sizes ) => sizes[ slug ] )
+			filter( imageSizing.imageSizes, ( { slug } ) =>
+				some( imageSizing.resizedImages, ( sizes ) => sizes[ slug ] )
 			),
 			( { name, slug } ) => ( { value: slug, label: name } )
 		);
 	}
 
-	function updateImagesSize( sizeSlug ) {
-		const updatedImages = map( images, ( image ) => {
-			if ( ! image.id ) {
-				return image;
-			}
-			const url = get( resizedImages, [
-				parseInt( image.id, 10 ),
-				sizeSlug,
-			] );
-			return {
-				...image,
-				...( url && { url } ),
-			};
-		} );
-
-		setAttributes( { images: updatedImages, sizeSlug } );
-	}
+	// function updateImagesSize( newSizeSlug ) {
+	// 	// Needs applying to child images somehow
+	// }
 
 	useEffect( () => {
 		if (
@@ -230,9 +263,8 @@ export const GalleryEdit = ( props ) => {
 		return mediaPlaceholder;
 	}
 
-	// const imageSizeOptions = getImagesSizeOptions();
-	// const shouldShowSizeOptions = hasImages && ! isEmpty( imageSizeOptions );
-	const shouldShowSizeOptions = false;
+	const imageSizeOptions = getImagesSizeOptions();
+	const shouldShowSizeOptions = hasImages && ! isEmpty( imageSizeOptions );
 
 	return (
 		<>
@@ -267,7 +299,7 @@ export const GalleryEdit = ( props ) => {
 							label={ __( 'Image size' ) }
 							value={ sizeSlug }
 							options={ imageSizeOptions }
-							onChange={ updateImagesSize }
+							// onChange={ updateImagesSize }
 						/>
 					) }
 				</PanelBody>
