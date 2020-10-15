@@ -175,6 +175,7 @@ export const GalleryEdit = ( props ) => {
 			imageUploads.length > 0
 		) {
 			onSelectImages( imageUploads );
+			setAttributes( { imageUploads: undefined } );
 		}
 	}, [ imageUploads ] );
 
